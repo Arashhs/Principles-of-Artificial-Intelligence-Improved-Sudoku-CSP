@@ -2,8 +2,9 @@ import data_structures as ds
 
 
 def main():
-    print("wow")
-    print(Warning("hey?"))
+    initial_state = ds.init_game("test1.txt")
+    print(initial_state)
+
     
 
     
