@@ -131,46 +131,66 @@ class CSP:
         # forward checking for number domain
         for index in assigned_var.number_constraints:
             cell = table[index.i][index.j]
-            number = assigned_var.number
-            if number in cell.number_domain:
-                cell.number_domain.remove(number)
+            self.number_arc_consistency(assigned_var, cell)
 
         # forward checking for color domain
         for index in assigned_var.color_constraints:
             # first we make prevent colors to be the same in adjacent cells
             cell = table[index.i][index.j]
-            color = assigned_var.color
-            if color in cell.color_domain:
-                cell.color_domain.remove(color)
-            # now we make sure cell with a higher number doesn't have any lower priority color in domain
-            number = assigned_var.number
-            if self.is_assigned(assigned_var, "both") and not self.is_assigned(cell, "color") and self.is_assigned(cell, "number"):
-                assigned_color_ind = colors.index(color)
-                if cell.number > number:
-                    for c in cell.color_domain:
-                        cell_color_ind = colors.index(c)
-                        if cell_color_ind > assigned_color_ind:
-                            cell.color_domain.remove(c)
-                elif cell.number < number:
-                    for c in cell.color_domain:
-                        cell_color_ind = colors.index(c)
-                        if cell_color_ind < assigned_color_ind:
-                            cell.color_domain.remove(c)
-            # reverse of the above condition
-            elif self.is_assigned(assigned_var, "both") and not self.is_assigned(cell, "number") and self.is_assigned(cell, "color"):
-                assigned_color_ind = colors.index(color)
-                cell_color_ind = colors.index(cell.color)
-                if assigned_color_ind < cell_color_ind:
-                    for n in cell.number_domain:
-                        if n > number:
-                            cell.number_domain.remove(n)
-                elif assigned_color_ind > cell_color_ind:
-                    for n in cell.number_domain:
-                        if n < number:
-                            cell.number_domain.remove(n)            
-
-
+            self.color_arc_consistency(assigned_var, cell)
+            self.color_arc_consistency(cell, assigned_var)
     
+
+    # make cell's number domain consistent with the assigned value for assigned_var
+    def number_arc_consistency(self, assigned_var, cell):
+        # forward checking for number domain
+        if assigned_var.number in cell.number_domain:
+            cell.number_domain.remove(assigned_var.number)
+
+
+    # make cell's color domain consistent with the assigned value for assigned_var
+    def color_arc_consistency(self, assigned_var, cell):
+        # forward checking for color domain
+        # first we make prevent colors to be the same in adjacent cells
+        number = assigned_var.number
+        color = assigned_var.color
+        if color in cell.color_domain:
+            cell.color_domain.remove(color)
+        # now we make sure cell with a higher number doesn't have any lower priority color in domain
+        number = assigned_var.number
+        remove_elems = []
+        if self.is_assigned(assigned_var, "both") and not self.is_assigned(cell, "color") and self.is_assigned(cell, "number"):
+            assigned_color_ind = colors.index(color)
+            if cell.number > number:
+                for c in cell.color_domain:
+                    cell_color_ind = colors.index(c)
+                    if cell_color_ind > assigned_color_ind:
+                        remove_elems.append(c)
+            elif cell.number < number:
+                for c in cell.color_domain:
+                    cell_color_ind = colors.index(c)
+                    if cell_color_ind < assigned_color_ind:
+                        remove_elems.append(c)
+            for elem in remove_elems:
+                cell.color_domain.remove(elem)
+
+        # reverse of the above condition
+        elif self.is_assigned(assigned_var, "both") and not self.is_assigned(cell, "number") and self.is_assigned(cell, "color"):
+            assigned_color_ind = colors.index(color)
+            cell_color_ind = colors.index(cell.color)
+            if assigned_color_ind < cell_color_ind:
+                for n in cell.number_domain:
+                    if n > number:
+                        remove_elems.append(n)
+            elif assigned_color_ind > cell_color_ind:
+                for n in cell.number_domain:
+                    if n < number:
+                        remove_elems.append(n) 
+            for elem in remove_elems:
+                cell.number_domain.remove(elem)
+           
+
+
     # checking if assignment is complete
     def is_complete(self, option="number"):
         table = self.rows

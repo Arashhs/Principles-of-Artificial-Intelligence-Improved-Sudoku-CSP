@@ -13,6 +13,7 @@ def backtrack_search(csp):
     csp.forward_check(cell)
     cell = csp.next_var()
     cell.number = 3
+    csp.forward_check(cell)
     print(cell)
     
 
