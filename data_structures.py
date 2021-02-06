@@ -10,10 +10,16 @@ class Cell:
     def __init__(self, number, color):
         self.number = number
         self.color = color
-        self.domain = None
-        self.degree = None
-        self.num_constraints = []
+        self.number_domain = []
+        self.color_domain = []
+        self.number_constraints = []
         self.color_constraints = []
+
+
+    # initializing domain
+    def init_domain(self):
+        global colors
+        self.domain = copy.deepcopy(colors)
 
     def __str__(self):
         num = self.number
@@ -48,10 +54,11 @@ class Constraint:
 
 
 # data structure for each sudoku state
-class State:
+class CSP:
     def __init__(self, rows):
         self.rows = rows
         self.init_constraints()
+        self.init_domains()
 
 
     # initializing the num and color constraints for each cell
@@ -60,21 +67,21 @@ class State:
         for i in range(len(table)):
             for j in range(len(table[0])):
                 constraint = Constraint(i, j)
-                self.add_num_constraint(constraint, i, j)
+                self.add_number_constraint(constraint, i, j)
                 self.add_color_constraint(constraint, i, j)
 
 
     # adding a constraint to every cell in the same row and column
-    def add_num_constraint(self, constraint, row, col):
+    def add_number_constraint(self, constraint, row, col):
         table = self.rows
         # adding constraint to the cells with the same row
         for j in range(len(table[row])):
             if j != col:
-                table[row][j].num_constraints.append(constraint)
+                table[row][j].number_constraints.append(constraint)
         # adding constraint to the cells with the same column
         for i in range(len(table)):
             if i != row:
-                table[i][col].num_constraints.append(constraint)
+                table[i][col].number_constraints.append(constraint)
 
 
     # adding a color constraint to adjacent cells
@@ -92,7 +99,184 @@ class State:
                     table[neighbor[0]][neighbor[1]].color_constraints.append(constraint)
 
 
+    # initializing the domains for each sell
+    def init_domains(self):
+        global colors
+        table = self.rows
+        number_domain = [i for i in range(1, len(table) + 1)]
+        for i in range(len(table)):
+            for j in range(len(table[0])):
+                table[i][j].number_domain = copy.deepcopy(number_domain)
+                table[i][j].color_domain = copy.deepcopy(colors)
+        self.init_consistent_domain()
+        
 
+    # deleting inconsistent initial values from domains
+    def init_consistent_domain(self):
+        table = self.rows
+        for i in range(len(table)):
+            for j in range(len(table[0])):
+                self.forward_check(table[i][j])
+
+    
+    # forward checking algorithm after assigning a value for assigned_var
+    def forward_check(self, assigned_var):
+        global colors
+        table = self.rows
+        # deleting the assigned number and color from assigned_var domains
+        if assigned_var.number in assigned_var.number_domain:
+            assigned_var.number_domain.remove(assigned_var.number)
+        if assigned_var.color in assigned_var.color_domain:
+            assigned_var.color_domain.remove(assigned_var.color)
+        # forward checking for number domain
+        for index in assigned_var.number_constraints:
+            cell = table[index.i][index.j]
+            number = assigned_var.number
+            if number in cell.number_domain:
+                cell.number_domain.remove(number)
+
+        # forward checking for color domain
+        for index in assigned_var.color_constraints:
+            # first we make prevent colors to be the same in adjacent cells
+            cell = table[index.i][index.j]
+            color = assigned_var.color
+            if color in cell.color_domain:
+                cell.color_domain.remove(color)
+            # now we make sure cell with a higher number doesn't have any lower priority color in domain
+            number = assigned_var.number
+            if self.is_assigned(assigned_var, "both") and not self.is_assigned(cell, "color") and self.is_assigned(cell, "number"):
+                assigned_color_ind = colors.index(color)
+                if cell.number > number:
+                    for c in cell.color_domain:
+                        cell_color_ind = colors.index(c)
+                        if cell_color_ind > assigned_color_ind:
+                            cell.color_domain.remove(c)
+                elif cell.number < number:
+                    for c in cell.color_domain:
+                        cell_color_ind = colors.index(c)
+                        if cell_color_ind < assigned_color_ind:
+                            cell.color_domain.remove(c)
+            # reverse of the above condition
+            elif self.is_assigned(assigned_var, "both") and not self.is_assigned(cell, "number") and self.is_assigned(cell, "color"):
+                assigned_color_ind = colors.index(color)
+                cell_color_ind = colors.index(cell.color)
+                if assigned_color_ind < cell_color_ind:
+                    for n in cell.number_domain:
+                        if n > number:
+                            cell.number_domain.remove(n)
+                elif assigned_color_ind > cell_color_ind:
+                    for n in cell.number_domain:
+                        if n < number:
+                            cell.number_domain.remove(n)            
+
+
+    
+    # checking if assignment is complete
+    def is_complete(self, option="number"):
+        table = self.rows
+        # checking number assignment
+        if option == "number":
+            for i in range(len(table)):
+                for j in range(len(table[0])):
+                    if table[i][j].number == None:
+                        return False
+        # checking color assignment        
+        elif option == "color":
+            for i in range(len(table)):
+                for j in range(len(table[0])):
+                    if table[i][j].color == None:
+                        return False
+        # checking both the color and number assignments       
+        elif option == "both":
+            for i in range(len(table)):
+                for j in range(len(table[0])):
+                    if table[i][j].color == None or table[i][j].number == None:
+                        return False
+        return True
+
+    
+    # returning the next cell variable for assignment based on MRV and degree heuristics
+    def next_var(self, option="number"):
+        table = self.rows
+        mrv_cells = self.get_mrv_vars(option)
+        next_cell = None
+        if len(mrv_cells) == 1:
+            next_cell = mrv_cells[0]
+        else:
+            next_cell = self.degree_heuristic(mrv_cells, option)
+        return next_cell
+
+
+    # returning the cells with
+    def get_mrv_vars(self, option="number"):
+        mrv_vars = []
+        min_domain_size = 100000
+        table = self.rows
+        # finding minimum domain size
+        for i in range(len(table)):
+            for j in range(len(table[0])):
+                # domain size for number
+                if option == "number":
+                    dom_size = len(table[i][j].number_domain)
+                # domain size for color
+                elif option == "color":
+                    dom_size = len(table[i][j].color_domain)
+                
+                if dom_size < min_domain_size and not self.is_assigned(table[i][j], option):
+                    min_domain_size = dom_size
+
+        # finding cells for which domain size is the same as min_domain_size
+        for i in range(len(table)):
+            for j in range(len(table[0])):
+                # domain size for number
+                if option == "number":
+                    dom_size = len(table[i][j].number_domain)
+                # domain size for color
+                elif option == "color":
+                    dom_size = len(table[i][j].color_domain)
+                
+                if dom_size == min_domain_size and not self.is_assigned(table[i][j], option):
+                    mrv_vars.append(table[i][j])
+        return mrv_vars
+
+    
+    # checking if the given cell has already an assigned value for its given option
+    def is_assigned(self, cell, option="number"):
+        if option == "number" and cell.number != None:
+            return True
+        elif option == "color" and cell.color != None:
+            return True
+        elif option == "both" and cell.number != None and cell.color != None:
+            return True
+        return False
+
+    
+    # getting the next variable using degree heuristic for when mrv heuristic doesn't return a single variable
+    def degree_heuristic(self, mrv_vars, option="number"):
+        max_degree = 0
+        # finding minimum degree
+        for i in range(len(mrv_vars)):
+            # degree for number
+            if option == "number":
+                cur_degree = len(mrv_vars[i].number_constraints)
+            # degree for color
+            elif option == "color":
+                cur_degree = len(mrv_vars[i].color_constraints)
+            
+            if cur_degree > max_degree:
+                max_degree = cur_degree
+        # returning the mrv variable with the least degree
+        for i in range(len(mrv_vars)):
+            # degree for number
+            if option == "number":
+                cur_degree = len(mrv_vars[i].number_constraints)
+            # degree for color
+            elif option == "color":
+                cur_degree = len(mrv_vars[i].color_constraints)
+            
+            if cur_degree == max_degree:
+                return mrv_vars[i]
+                
 
     def __str__(self):
         string = ""
@@ -113,7 +297,7 @@ class State:
 
 
 def init_game(file_name):
-    global rows_num, colors_num
+    global rows_num, colors_num, colors
     rows = []
     row_cells = []
     with open(file_name, 'r') as reader:
@@ -140,11 +324,13 @@ def init_game(file_name):
                     color = elem_items[1]
                     if num == "*":
                         num = None
+                    else:
+                        num = int(num)
                     if color == "#":
                         color = None 
                     cell = Cell(num, color)
                     row_cells[i].append(cell)
 
-        # building the initial state
-    init_state = State(row_cells)
+    # building the CSP
+    init_state = CSP(row_cells)
     return init_state
