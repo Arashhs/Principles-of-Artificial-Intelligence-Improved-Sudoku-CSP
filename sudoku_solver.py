@@ -2,7 +2,6 @@ import data_structures as ds
 import copy
 
 
-
 # defining the back-track function
 def backtrack_search(csp):
     print(csp, "\n")
@@ -15,8 +14,8 @@ def backtrack_search(csp):
         inference = cur_csp.forward_check(var)
         if inference != 'failure':
             result = backtrack_search(cur_csp)
-            result = backtrack_search_color(result)
             if result != 'failure':
+                result = backtrack_search_color(result)
                 return result
         var.number_domain.remove(value)
         cur_csp = copy.deepcopy(csp)

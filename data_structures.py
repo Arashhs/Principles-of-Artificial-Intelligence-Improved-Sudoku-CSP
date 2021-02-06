@@ -123,11 +123,6 @@ class CSP:
     def forward_check(self, assigned_var):
         global colors
         table = self.rows
-        # deleting the assigned number and color from assigned_var domains
-        if assigned_var.number in assigned_var.number_domain:
-            assigned_var.number_domain.remove(assigned_var.number)
-        if assigned_var.color in assigned_var.color_domain:
-            assigned_var.color_domain.remove(assigned_var.color)
         # forward checking for number domain
         for index in assigned_var.number_constraints:
             cell = table[index.i][index.j]
