@@ -7,9 +7,11 @@ colors = None
 
 # data structure for each sudoku cell
 class Cell:
-    def __init__(self, number, color):
+    def __init__(self, number, color, i, j):
         self.number = number
         self.color = color
+        self.i = i
+        self.j = j
         self.number_domain = []
         self.color_domain = []
         self.number_constraints = []
@@ -59,6 +61,26 @@ class CSP:
         self.rows = rows
         self.init_constraints()
         self.init_domains()
+
+    # re-implementing the copy function
+    def __copy__(self):
+        table = self.rows
+        new_table = [[] for i in range(len(table))]
+        for i in range(len(table)):
+            for j in range(len(table[0])):
+                num = table[i][j].number
+                col = table[i][j].color
+                num_constraints = table[i][j].number_constraints
+                col_constraints = table[i][j].color_constraints
+                num_domain = table[i][j].number_domain.copy()
+                col_domain = table[i][j].color_domain.copy()
+                new_cell = Cell(num, col, i, j)
+                new_cell.number_constraints = num_constraints
+                new_cell.color_constraints = col_constraints
+                new_cell.number_domain = num_domain
+                new_cell.color_domain = col_domain
+                new_table[i].append(new_cell)
+        return CSP(new_table)
 
 
     # initializing the num and color constraints for each cell
@@ -123,6 +145,11 @@ class CSP:
     def forward_check(self, assigned_var):
         global colors
         table = self.rows
+         # deleting the assigned number and color from assigned_var domains
+        if assigned_var.number in assigned_var.number_domain:
+            assigned_var.number_domain.remove(assigned_var.number)
+        if assigned_var.color in assigned_var.color_domain:
+            assigned_var.color_domain.remove(assigned_var.color)
         # forward checking for number domain
         for index in assigned_var.number_constraints:
             cell = table[index.i][index.j]
@@ -230,13 +257,35 @@ class CSP:
     # returning the next cell variable for assignment based on MRV and degree heuristics
     def next_var(self, option="number"):
         table = self.rows
-        mrv_cells = self.get_mrv_vars(option)
+        mrv_cells = None
+        hint = ""
+        if option == "both":
+            mrv_cells_number = self.get_mrv_vars("number")
+            mrv_cells_color = self.get_mrv_vars("color")
+            if len(mrv_cells_number) == 0:
+                mrv_cells = mrv_cells_color
+                hint = "color"
+            elif len(mrv_cells_color) == 0:
+                mrv_cells = mrv_cells_number
+                hint = "number"
+            else:
+                num_domain_length = len(mrv_cells_number[0].number_domain)
+                color_domain_length = len(mrv_cells_color[0].color_domain)
+                if num_domain_length <= color_domain_length:
+                    mrv_cells = mrv_cells_number
+                    hint = "number"
+                else:
+                    mrv_cells = mrv_cells_color
+                    hint = "color"
+        else:
+            mrv_cells = self.get_mrv_vars(option)
+            hint = option
         next_cell = None
         if len(mrv_cells) == 1:
             next_cell = mrv_cells[0]
         else:
-            next_cell = self.degree_heuristic(mrv_cells, option)
-        return next_cell
+            next_cell = self.degree_heuristic(mrv_cells, hint)
+        return next_cell, hint
 
 
     # returning the cells with
@@ -347,6 +396,7 @@ def init_game(file_name):
         for i in range(len(rows)-1):
             row_cells[i] = []
             for elem in rows[i+1]:
+                counter = 0
                 match = re.match(r"([\*0-9]+)([\#a-z]+)", elem, re.I)
                 if match:
                     elem_items = match.groups()
@@ -358,7 +408,8 @@ def init_game(file_name):
                         num = int(num)
                     if color == "#":
                         color = None 
-                    cell = Cell(num, color)
+                    cell = Cell(num, color, i, counter)
+                    counter += 1
                     row_cells[i].append(cell)
 
     # building the CSP
