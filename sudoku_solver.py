@@ -5,16 +5,42 @@ import copy
 
 # defining the back-track function
 def backtrack_search(csp):
-    if csp.is_complete():
+    print(csp, "\n")
+    if csp.is_complete("number"):
         return csp
-    cur_state = copy.deepcopy(csp)
-    cell = csp.next_var(option="number")
-    cell.number = 2
-    csp.forward_check(cell)
-    cell = csp.next_var()
-    cell.number = 3
-    csp.forward_check(cell)
-    print(cell)
+    cur_csp = copy.deepcopy(csp)
+    var = cur_csp.next_var(option="number")
+    for value in var.number_domain:
+        var.number = value
+        inference = cur_csp.forward_check(var)
+        if inference != 'failure':
+            result = backtrack_search(cur_csp)
+            result = backtrack_search_color(result)
+            if result != 'failure':
+                return result
+        var.number_domain.remove(value)
+        cur_csp = copy.deepcopy(csp)
+    return 'failure'
+
+
+# backtrack search for color
+def backtrack_search_color(csp):
+    print(csp, "\n")
+    if csp.is_complete("color"):
+        return csp
+    cur_csp = copy.deepcopy(csp)
+    var = cur_csp.next_var(option="color")
+    for value in var.color_domain:
+        if cur_csp.color_is_consistent(var, value):
+            var.color = value
+            inference = cur_csp.forward_check(var)
+            if inference != 'failure':
+                result = backtrack_search_color(cur_csp)
+                if result != 'failure':
+                    return result
+        var.color_domain.remove(value)
+        cur_csp = copy.deepcopy(csp)
+    return 'failure'
     
 
 
@@ -23,8 +49,8 @@ def backtrack_search(csp):
 
 def main():
     csp = ds.init_game("test1.txt")
-    print(csp)
-    backtrack_search(csp)
+    result = backtrack_search(csp)
+    print("Final result:\n{}\n".format(result))
 
     
 

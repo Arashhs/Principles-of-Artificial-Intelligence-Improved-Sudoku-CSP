@@ -189,6 +189,23 @@ class CSP:
             for elem in remove_elems:
                 cell.number_domain.remove(elem)
            
+    
+    # checking if a chosen color for a variable is consistent with our csp
+    def color_is_consistent(self, var, value):
+        global colors
+        table = self.rows
+        for index in var.color_constraints:
+            cell = table[index.i][index.j]
+            if value == cell.color:
+                return False
+            if self.is_assigned(cell, "both"):
+                cell_color_ind = colors.index(cell.color)
+                var_color_ind = colors.index(value)
+                if cell_color_ind < var_color_ind and cell.number < var.number:
+                    return False
+                elif cell_color_ind > var_color_ind and cell.number > var.number:
+                    return False
+        return True
 
 
     # checking if assignment is complete
@@ -309,8 +326,6 @@ class CSP:
             string = string + "\n" if i != len(self.rows) - 1 else string
         return string
 
-    def __eq__(self, other):
-        return self.rows == other.rows
 
     def __repr__(self):
         return str(self)
