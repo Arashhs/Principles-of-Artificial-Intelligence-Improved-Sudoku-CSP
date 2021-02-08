@@ -51,7 +51,7 @@ def restore_inferences(var, csp):
 
 
 def main():
-    csp = ds.init_game("test5.txt")
+    csp = ds.init_game("test1.txt")
     result = backtrack_search(csp)
     print("Final result:\n{}\n".format(result))
 
